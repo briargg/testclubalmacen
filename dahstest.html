@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>ClubAlmacén - Autenticación</title>
+    <script src="https://www.gstatic.com/firebasejs/7.20.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.20.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.20.0/firebase-firestore.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(to bottom, #ff4d4d, #ffffff);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 30px 20px;
+            max-width: 400px;
+            width: 90%;
+            margin: 20px auto;
+        }
+
+        h1, h2, h3 {
+            margin-bottom: 20px;
+            color: #b30000;
+        }
+
+        input, button, select {
+            margin: 10px 0;
+            padding: 12px;
+            font-size: 16px;
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #b30000;
+            color: white;
+            font-weight: bold;
+            transition: background 0.3s;
+            border: none;
+        }
+
+        button:hover {
+            background-color: #ff1a1a;
+        }
+
+        #statusMessage {
+            color: green;
+            font-weight: bold;
+        }
+
+        .logo {
+            margin-bottom: 30px;
+            user-select: none;
+            display: flex;
+            justify-content: center;
+        }
+
+        .logo img {
+            max-width: 180px;
+            width: 100%;
+            height: auto;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+
+        .category-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .category-buttons button {
+            flex: 1 1 45%;
+            min-width: 120px;
+        }
+
+        .purchase-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+
+        .purchase-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 15px 0;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        @media (max-width: 500px) {
+            .container {
+                padding: 20px 15px;
+            }
+        }
+        #misFiados {
+    margin-top: 15px;
+}
+
+.fiadocard {
+    background: white;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.fiadocard h4 {
+    margin: 0 0 5px 0;
+    color: #2c3e50;
+}
+
+.fiadocard p {
+    margin: 5px 0;
+    color: #27ae60;
+    font-weight: bold;
+}
+
+    </style>
+</head>
+<body>
+
+    <div class="logo">
+      <img src="logo club almacen blanco sin fondo.png" alt="Logo ClubAlmacén" />
+    </div>
+
+    <div class="container" id="authContainer">
+        <h1>Acceder o Registrarse</h1>
+        <div style="display: flex; justify-content: space-around; margin-bottom: 10px;">
+            <button onclick="toggleAuthMode('login')" style="width: 45%;">Iniciar Sesión</button>
+            <button onclick="toggleAuthMode('signup')" style="width: 45%;">Registrarse</button>
+        </div>
+        <input type="email" id="email" placeholder="Email" required />
+        <input type="password" id="password" placeholder="Contraseña" required />
+        <button id="signupButton" style="display:none;">Registrarse</button>
+        <button id="loginButton" style="display:block;">Iniciar Sesión</button>
+        <p id="statusMessage"></p>
+    </div>
+
+    <div class="container" id="userDetails" style="display:none;">
+        <h2>Selecciona tu Rol</h2>
+        <button id="clienteButton">Cliente</button>
+        <button id="comercianteButton">Comerciante</button>
+        <button id="logoutButton">Cerrar Sesión</button>
+    </div>
+
+    <div class="container" id="clienteDetails" style="display:none;">
+        <h2>Bienvenido Cliente</h2>
+        <button id="addPurchaseButton">Agregar Compra</button>
+        <button id="payButton">Pagar</button>
+        <p id="purchaseDetails">Compras realizadas: 0</p>
+        <button id="logoutButtonCliente">Cerrar Sesión</button>
+
+        
+        <!-- Dentro del div clienteDetails, agregar: -->
+<div id="clienteCreditInfo" style="margin: 15px 0; padding: 10px; background: #f0f8ff; border-radius: 8px;">
+    <h3>Tu Crédito Disponible</h3>
+    <p id="creditoDisponible">Cargando información de crédito...</p>
+    <button id="refreshCreditButton">Actualizar Crédito</button>
+</div>
+        
+        <!-- Sección para agregar compras -->
+        <div id="purchaseSection" style="display:none;">
+            <h3>Selecciona una categoría</h3>
+            <div class="category-buttons">
+                <button onclick="selectCategory('almacen')">Almacén</button>
+                <button onclick="selectCategory('verduleria')">Verdulería</button>
+                <button onclick="selectCategory('carniceria')">Carnicería</button>
+                <button onclick="selectCategory('farmacia')">Farmacia</button>
+            </div>
+            
+            <div id="comerciantesList" style="display:none;">
+                <h3>Selecciona un comerciante</h3>
+                <select id="comercianteSelect">
+                    <option value="">Seleccionar Comerciante</option>
+                </select>
+                <div id="itemsSection" style="display:none;">
+                    <h3>Agregar productos</h3>
+                    <input type="text" id="itemName" placeholder="Nombre del producto">
+                    <input type="number" id="itemPrice" placeholder="Precio" step="0.01">
+                    <input type="number" id="itemQuantity" placeholder="Cantidad" value="1">
+                    <button onclick="addItemToList()">Agregar a la lista</button>
+                    
+                    <div class="purchase-list" id="itemsList"></div>
+                    
+                    <button id="submitPurchaseButton" onclick="submitPurchase()">Enviar Compra</button>
+                </div>
+            </div>
+        </div>
+        <!-- Añade esta sección ANTES de "Compras Pendientes" -->
+    <div id="creditSection" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+        <h3>Mis Líneas de Crédito</h3>
+        <div id="misFiados">
+            <!-- Aquí se cargarán los fiados dinámicamente -->
+        </div>
+        <button onclick="loadMyFiados(auth.currentUser.uid)" style="margin-top: 10px;">
+            Actualizar Créditos
+        </button>
+    </div>
+        <!-- Lista de compras pendientes -->
+        <div id="pendingPurchases" style="margin-top: 20px;">
+            <h3>Compras Pendientes</h3>
+            <div class="purchase-list" id="pendingPurchasesList"></div>
+        </div>
+        <!-- Para Cliente: Dentro de clienteDetails -->
+<div id="approvedPurchases" style="margin-top: 20px;">
+    <h3>Tus Compras Aprobadas</h3>
+    <div class="purchase-list" id="approvedPurchasesList"></div>
+</div>
+    </div>
+    
+
+    <div class="container" id="comercianteDetails" style="display:none;">
+        <h2>Bienvenido Comerciante</h2>
+        <button id="addPurchaseComercianteButton">Agregar Compra</button>
+        <p id="comercianteDetailsText">Ventas realizadas: 0</p>
+        <button id="logoutButtonComerciante">Cerrar Sesión</button>
+        
+        <!-- Compras pendientes de aprobación -->
+        <div id="approvalSection" style="margin-top: 20px;">
+            <h3>Compras por Aprobar</h3>
+            <div class="purchase-list" id="purchasesToApprove"></div>
+        </div>
+        <!-- Para Comerciante: Dentro de comercianteDetails -->
+<div id="approvedPurchasesMerchant" style="margin-top: 20px;">
+    <h3>Compras Aprobadas</h3>
+    <div class="purchase-list" id="approvedPurchasesMerchantList"></div>
+</div>
+
+    </div>
+
+    <div class="container" id="fiadoContainer" style="display:none;">
+        <h3>Habilitar Fiado</h3>
+        <select id="clienteSelect">
+            <option value="">Seleccionar Cliente</option>
+        </select>
+        <input type="number" id="montoFiado" placeholder="Monto a fiar" />
+        <button id="habilitarFiadoButton">Habilitar Fiado</button>
+        
+        <!-- Lista de clientes con fiado -->
+        <div id="fiadoList" style="margin-top: 20px;">
+            <h3>Clientes con Fiado</h3>
+            <div class="purchase-list" id="clientesFiado"></div>
+        </div>
+    </div>
+
+    <script>
+       // Inicializa Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyB89PuH-5zSpQpI1QASHrEcrQvtUWsDn7A",
+    authDomain: "clubalmacen.firebaseapp.com",
+    projectId: "clubalmacen",
+    storageBucket: "clubalmacen.appspot.com",
+    messagingSenderId: "284091950744",
+    appId: "1:284091950744:web:578d9d1aae581225d592ed",
+    measurementId: "G-MWHWM339Y2"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// Variables globales
+let currentPurchase = {
+    category: '',
+    comercianteId: '',
+    items: [],
+    total: 0
+};
+
+// Elementos del DOM
+const signupButton = document.getElementById("signupButton");
+const loginButton = document.getElementById("loginButton");
+const clienteButton = document.getElementById("clienteButton");
+const comercianteButton = document.getElementById("comercianteButton");
+const authContainer = document.getElementById("authContainer");
+const userDetails = document.getElementById("userDetails");
+const clienteDetails = document.getElementById("clienteDetails");
+const comercianteDetails = document.getElementById("comercianteDetails");
+const fiadoContainer = document.getElementById("fiadoContainer");
+const addPurchaseButton = document.getElementById("addPurchaseButton");
+const purchaseSection = document.getElementById("purchaseSection");
+
+// Registro de usuario
+signupButton.addEventListener("click", () => {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    
+    auth.createUserWithEmailAndPassword(email, password)
+        .then(userCredential => {
+            alert("Usuario registrado con éxito");
+            showRoleSelection(userCredential.user);
+        })
+        .catch(error => alert(error.message));
+});
+
+// Inicio de sesión
+loginButton.addEventListener("click", () => {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    
+    auth.signInWithEmailAndPassword(email, password)
+        .then(userCredential => {
+            alert("Inicio de sesión exitoso");
+            checkUserRole(userCredential.user);
+        })
+        .catch(error => alert(error.message));
+});
+
+// Función para mostrar la selección de rol
+function showRoleSelection(user) {
+    authContainer.style.display = "none";
+    userDetails.style.display = "block";
+    
+    clienteButton.addEventListener("click", () => assignRole(user, "cliente"));
+    comercianteButton.addEventListener("click", () => assignRole(user, "comerciante"));
+    
+    // Configurar botón de cierre de sesión
+    document.getElementById("logoutButton").addEventListener("click", signOut);
+}
+
+// Asignar rol y guardarlo en Firestore
+function assignRole(user, role) {
+    db.collection("users").doc(user.uid).set({
+        email: user.email,
+        role: role
+    })
+    .then(() => {
+        alert("Rol asignado: " + role);
+        checkUserRole(user);
+    })
+    .catch(error => alert("Error al asignar rol: " + error.message));
+}
+
+// Comprobar el rol del usuario
+function checkUserRole(user) {
+    db.collection("users").doc(user.uid).get()
+        .then(doc => {
+            if (doc.exists) {
+                const role = doc.data().role;
+                userDetails.style.display = "none";
+
+                if (role === "cliente") {
+                    clienteDetails.style.display = "block";
+                    setupClienteUI(user);
+                } else if (role === "comerciante") {
+                    comercianteDetails.style.display = "block";
+                    fiadoContainer.style.display = "block";
+                    setupComercianteUI(user);
+                }
+            } else {
+                showRoleSelection(user);
+            }
+        })
+        .catch(error => alert("Error al obtener el rol: " + error.message));
+}
+
+// Configurar UI para cliente
+function setupClienteUI(user) {
+    // Configurar botón de cierre de sesión
+    document.getElementById("logoutButtonCliente").addEventListener("click", signOut);
+    
+    // Configurar botón para agregar compra
+    addPurchaseButton.addEventListener("click", () => {
+        purchaseSection.style.display = purchaseSection.style.display === "none" ? "block" : "none";
+        if (purchaseSection.style.display === "block") {
+            loadComerciantes();
+        }
+    });
+    
+    
+    // Cargar compras del cliente
+    loadClientPurchases(user.uid);
+    
+    // Cargar fiados del cliente
+    loadMyFiados(user.uid);
+}
+
+// Configurar UI para comerciante
+function setupComercianteUI(user) {
+    // Configurar botón de cierre de sesión
+    document.getElementById("logoutButtonComerciante").addEventListener("click", signOut);
+    
+    // Cargar clientes para fiado
+    cargarClientes();
+    
+    // Configurar botón para habilitar fiado
+    document.getElementById("habilitarFiadoButton").addEventListener("click", habilitarFiado);
+    
+    // Cargar compras pendientes de aprobación
+    loadPurchasesToApprove(user.uid);
+    
+    // Cargar clientes con fiado activo
+    loadClientesFiado(user.uid);
+}
+
+// Cerrar sesión
+function signOut() {
+    auth.signOut().then(() => {
+        window.location.reload();
+    }).catch(error => {
+        alert("Error al cerrar sesión: " + error.message);
+    });
+}
+
+// Cargar comerciantes para selección
+async function loadComerciantes() {
+    try {
+        const querySnapshot = await db.collection("users").where("role", "==", "comerciante").get();
+        const comercianteSelect = document.getElementById("comercianteSelect");
+        comercianteSelect.innerHTML = '<option value="">Seleccionar Comerciante</option>';
+        
+        querySnapshot.forEach(doc => {
+            const option = document.createElement("option");
+            option.value = doc.id;
+            option.textContent = doc.data().email;
+            comercianteSelect.appendChild(option);
+        });
+        
+        comercianteSelect.addEventListener("change", (e) => {
+            if (e.target.value) {
+                document.getElementById("itemsSection").style.display = "block";
+                currentPurchase.comercianteId = e.target.value;
+            } else {
+                document.getElementById("itemsSection").style.display = "none";
+            }
+        });
+    } catch (error) {
+        console.error("Error al cargar comerciantes:", error);
+        alert("Error al cargar comerciantes");
+    }
+}
+
+// Seleccionar categoría
+function selectCategory(category) {
+    currentPurchase.category = category;
+    document.getElementById("comerciantesList").style.display = "block";
+}
+
+// Agregar item a la lista de compra
+function addItemToList() {
+    const name = document.getElementById("itemName").value;
+    const price = parseFloat(document.getElementById("itemPrice").value);
+    const quantity = parseInt(document.getElementById("itemQuantity").value);
+    
+    if (!name || isNaN(price) || isNaN(quantity) || price <= 0 || quantity <= 0) {
+        alert("Por favor complete todos los campos correctamente");
+        return;
+    }
+    
+    const item = {
+        name,
+        price,
+        quantity,
+        total: price * quantity
+    };
+    
+    currentPurchase.items.push(item);
+    currentPurchase.total += item.total;
+    
+    updateItemsList();
+    
+    // Limpiar campos
+    document.getElementById("itemName").value = "";
+    document.getElementById("itemPrice").value = "";
+    document.getElementById("itemQuantity").value = "1";
+}
+
+// Actualizar lista visual de items
+function updateItemsList() {
+    const itemsList = document.getElementById("itemsList");
+    itemsList.innerHTML = "";
+    
+    currentPurchase.items.forEach((item, index) => {
+        const div = document.createElement("div");
+        div.className = "purchase-item";
+        div.innerHTML = `
+            <span>${item.name} (${item.quantity} x $${item.price.toFixed(2)})</span>
+            <span>$${item.total.toFixed(2)} <button onclick="removeItem(${index})">X</button></span>
+        `;
+        itemsList.appendChild(div);
+    });
+    
+    // Mostrar total
+    const totalDiv = document.createElement("div");
+    totalDiv.style.fontWeight = "bold";
+    totalDiv.style.marginTop = "10px";
+    totalDiv.textContent = `Total: $${currentPurchase.total.toFixed(2)}`;
+    itemsList.appendChild(totalDiv);
+}
+
+// Eliminar item de la lista
+function removeItem(index) {
+    currentPurchase.total -= currentPurchase.items[index].total;
+    currentPurchase.items.splice(index, 1);
+    updateItemsList();
+}
+
+// Enviar compra para aprobación
+async function submitPurchase() {
+    console.log("Iniciando submitPurchase...");
+    console.log("Datos de compra actual:", currentPurchase);
+    
+    if (currentPurchase.items.length === 0) {
+        alert("Agregue al menos un producto a la compra");
+        return;
+    }
+    
+    const user = auth.currentUser;
+    if (!user) {
+        console.error("Usuario no autenticado");
+        alert("No estás autenticado. Por favor inicia sesión nuevamente.");
+        return;
+    }
+    
+    try {
+        console.log("Preparando datos para Firestore...");
+        const purchaseData = {
+            clienteId: user.uid,
+            clienteEmail: user.email,
+            comercianteId: currentPurchase.comercianteId,
+            category: currentPurchase.category,
+            items: currentPurchase.items,
+            total: currentPurchase.total,
+            status: "pending",
+            createdAt: new Date().toISOString()
+        };
+        
+        console.log("Datos a enviar:", purchaseData);
+        
+        // Verificar conexión a Firestore
+        console.log("Intentando conectar con Firestore...");
+        await db.collection("purchases").add(purchaseData);
+        
+        console.log("Compra enviada exitosamente");
+        alert("Compra enviada para aprobación");
+        
+        // Resetear compra actual
+        currentPurchase = {
+            category: '',
+            comercianteId: '',
+            items: [],
+            total: 0
+        };
+        
+        // Ocultar secciones
+        purchaseSection.style.display = "none";
+        document.getElementById("comerciantesList").style.display = "none";
+        document.getElementById("itemsSection").style.display = "none";
+        document.getElementById("itemsList").innerHTML = "";
+        
+        // Actualizar lista de compras pendientes
+        loadPendingPurchases(user.uid);
+        
+    } catch (error) {
+        console.error("Error completo al enviar compra:", error);
+        console.error("Mensaje de error:", error.message);
+        console.error("Stack trace:", error.stack);
+        alert(`Error al enviar compra: ${error.message}`);
+    }
+}
+
+// Cargar compras pendientes del cliente
+async function loadPendingPurchases(clienteId) {
+    try {
+        const querySnapshot = await db.collection("purchases")
+            .where("clienteId", "==", clienteId)
+            .where("status", "==", "pending")
+            .orderBy("createdAt", "desc")
+            .get();
+        
+        const pendingList = document.getElementById("pendingPurchasesList");
+        pendingList.innerHTML = "";
+        
+        if (querySnapshot.empty) {
+            pendingList.innerHTML = "<p>No hay compras pendientes</p>";
+            return;
+        }
+        
+        querySnapshot.forEach(doc => {
+            const purchase = doc.data();
+            const div = document.createElement("div");
+            div.className = "purchase-item";
+            div.innerHTML = `
+                <div>
+                    <strong>${purchase.category}</strong><br>
+                    ${purchase.items.length} productos<br>
+                    Total: $${purchase.total.toFixed(2)}
+                </div>
+                <div>
+                    ${new Date(purchase.createdAt).toLocaleString()}
+                </div>
+            `;
+            pendingList.appendChild(div);
+        });
+        
+    } catch (error) {
+        console.error("Error al cargar compras pendientes:", error);
+    }
+}
+
+// Cargar compras pendientes de aprobación para el comerciante
+async function loadPurchasesToApprove(comercianteId) {
+    try {
+        const querySnapshot = await db.collection("purchases")
+            .where("comercianteId", "==", comercianteId)
+            .where("status", "==", "pending")
+            .orderBy("createdAt", "desc")
+            .get();
+        
+        const approveList = document.getElementById("purchasesToApprove");
+        approveList.innerHTML = "";
+        
+        if (querySnapshot.empty) {
+            approveList.innerHTML = "<p>No hay compras por aprobar</p>";
+            return;
+        }
+        
+        querySnapshot.forEach(doc => {
+            const purchase = doc.data();
+            const div = document.createElement("div");
+            div.className = "purchase-item";
+            div.innerHTML = `
+                <div>
+                    <strong>${purchase.clienteEmail}</strong><br>
+                    ${purchase.category} - ${purchase.items.length} productos<br>
+                    Total: $${purchase.total.toFixed(2)}
+                </div>
+                <div>
+                    <button onclick="approvePurchase('${doc.id}', '${purchase.clienteId}', ${purchase.total})">Aprobar</button>
+                    <button onclick="rejectPurchase('${doc.id}')">Rechazar</button>
+                </div>
+            `;
+            approveList.appendChild(div);
+        });
+        
+    } catch (error) {
+        console.error("Error al cargar compras por aprobar:", error);
+    }
+}
+
+// Aprobar compra
+async function approvePurchase(purchaseId, clienteId, total) {
+    const comerciante = auth.currentUser;
+    if (!comerciante) return;
+    
+    try {
+        // Verificar fiado disponible
+        const fiadoRef = db.collection("users").doc(comerciante.uid)
+            .collection("fiados").doc(clienteId);
+        
+        const fiadoDoc = await fiadoRef.get();
+        
+        if (!fiadoDoc.exists) {
+            alert("Este cliente no tiene fiado habilitado");
+            return;
+        }
+        
+        const fiadoData = fiadoDoc.data();
+        const nuevoMonto = fiadoData.monto_fiado - total;
+        
+        if (nuevoMonto < 0) {
+            alert("El cliente no tiene suficiente crédito disponible");
+            return;
+        }
+        
+        // Actualizar compra
+        await db.collection("purchases").doc(purchaseId).update({
+            status: "approved",
+            approvedAt: new Date().toISOString()
+        });
+        
+        // Actualizar monto fiado
+        await fiadoRef.update({
+            monto_fiado: nuevoMonto
+        });
+        
+        alert("Compra aprobada y descontada del fiado");
+        
+        // Recargar listas
+        loadPurchasesToApprove(comerciante.uid);
+        loadClientesFiado(comerciante.uid);
+        
+    } catch (error) {
+        console.error("Error al aprobar compra:", error);
+        alert("Error al aprobar compra");
+    }
+}
+
+// Rechazar compra
+async function rejectPurchase(purchaseId) {
+    try {
+        await db.collection("purchases").doc(purchaseId).update({
+            status: "rejected",
+            rejectedAt: new Date().toISOString()
+        });
+        
+        alert("Compra rechazada");
+        
+        // Recargar lista
+        const comerciante = auth.currentUser;
+        if (comerciante) {
+            loadPurchasesToApprove(comerciante.uid);
+        }
+        
+    } catch (error) {
+        console.error("Error al rechazar compra:", error);
+        alert("Error al rechazar compra");
+    }
+}
+
+// Cargar clientes para fiado
+async function cargarClientes() {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+        const clientesRef = db.collection("users").where("role", "==", "cliente");
+        const snapshot = await clientesRef.get();
+
+        const clienteSelect = document.getElementById("clienteSelect");
+        clienteSelect.innerHTML = '<option value="">Seleccionar Cliente</option>';
+
+        snapshot.forEach(doc => {
+            const clienteData = doc.data();
+            const option = document.createElement("option");
+            option.value = doc.id;
+            option.textContent = clienteData.email;
+            clienteSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error("Error al cargar clientes:", error);
+    }
+}
+
+// Habilitar fiado
+async function habilitarFiado() {
+    const clienteUID = document.getElementById("clienteSelect").value;
+    const montoFiado = parseFloat(document.getElementById("montoFiado").value);
+    const comerciante = auth.currentUser;
+
+    if (!clienteUID || isNaN(montoFiado) || montoFiado <= 0) {
+        alert("Selecciona un cliente e ingresa un monto válido.");
+        return;
+    }
+
+    try {
+        // Guardar fiado en la subcolección del comerciante
+        await db.collection("users").doc(comerciante.uid)
+            .collection("fiados").doc(clienteUID).set({
+                monto_fiado: montoFiado,
+                fecha_inicio: new Date().toISOString(),
+                clienteEmail: document.getElementById("clienteSelect").options[document.getElementById("clienteSelect").selectedIndex].text
+            });
+
+        alert("Fiado habilitado correctamente.");
+        
+        // Limpiar campos
+        document.getElementById("clienteSelect").value = "";
+        document.getElementById("montoFiado").value = "";
+        
+        // Actualizar lista
+        loadClientesFiado(comerciante.uid);
+        
+    } catch (error) {
+        console.error("Error al habilitar fiado:", error.message);
+        alert("Error al habilitar fiado: " + error.message);
+    }
+}
+
+// Cargar clientes con fiado activo
+async function loadClientesFiado(comercianteId) {
+    try {
+        const querySnapshot = await db.collection("users").doc(comercianteId)
+            .collection("fiados").get();
+        
+        const clientesList = document.getElementById("clientesFiado");
+        clientesList.innerHTML = "";
+        
+        if (querySnapshot.empty) {
+            clientesList.innerHTML = "<p>No hay clientes con fiado activo</p>";
+            return;
+        }
+        
+        querySnapshot.forEach(doc => {
+            const fiadoData = doc.data();
+            const div = document.createElement("div");
+            div.className = "purchase-item";
+            div.innerHTML = `
+                <div>
+                    <strong>${fiadoData.clienteEmail || 'Cliente'}</strong><br>
+                    Monto disponible: $${fiadoData.monto_fiado.toFixed(2)}
+                </div>
+                <div>
+                    ${new Date(fiadoData.fecha_inicio).toLocaleDateString()}
+                </div>
+            `;
+            clientesList.appendChild(div);
+        });
+        
+    } catch (error) {
+        console.error("Error al cargar clientes con fiado:", error);
+    }
+}
+
+// Cargar fiados del cliente
+async function loadMyFiados(clienteId) {
+    try {
+        const comerciantesSnapshot = await db.collection("users")
+            .where("role", "==", "comerciante")
+            .get();
+
+        const fiadoList = document.getElementById("misFiados");
+        fiadoList.innerHTML = "";
+
+        for (const doc of comerciantesSnapshot.docs) {
+            const comercianteId = doc.id;
+            const fiadoRef = db.collection("users").doc(comercianteId)
+                .collection("fiados").doc(clienteId);
+
+            const fiadoDoc = await fiadoRef.get();
+
+            if (fiadoDoc.exists) {
+                const fiadoData = fiadoDoc.data();
+                const div = document.createElement("div");
+                div.className = "purchase-item";
+                div.innerHTML = `
+                    <div>
+                        <strong>Comerciante: ${doc.data().email}</strong><br>
+                        Crédito disponible: $${fiadoData.monto_fiado.toFixed(2)}
+                    </div>
+                    <div>
+                        Desde: ${new Date(fiadoData.fecha_inicio).toLocaleDateString()}
+                    </div>
+                `;
+                fiadoList.appendChild(div);
+            }
+        }
+
+    } catch (error) {
+        console.error("Error al cargar fiados del cliente:", error);
+    }
+}
+
+// Alternar entre login y registro
+function toggleAuthMode(mode) {
+    if (mode === 'login') {
+        signupButton.style.display = 'none';
+        loginButton.style.display = 'block';
+    } else {
+        signupButton.style.display = 'block';
+        loginButton.style.display = 'none';
+    }
+}
+
+// Verifica si el usuario ya está autenticado
+auth.onAuthStateChanged(user => {
+    if (user) {
+        checkUserRole(user);
+    } else {
+        // Mostrar formulario de autenticación
+        authContainer.style.display = "block";
+        userDetails.style.display = "none";
+        clienteDetails.style.display = "none";
+        comercianteDetails.style.display = "none";
+        fiadoContainer.style.display = "none";
+    }
+    // Enviar compra (desde el cliente)
+async function enviarCompra(items, total, category, comercianteId) {
+    const cliente = auth.currentUser;
+    if (!cliente) {
+        alert("Debes iniciar sesión como cliente");
+        return;
+    }
+
+    try {
+        await db.collection("purchases").add({
+            clienteId: cliente.uid,               // UID del cliente autenticado
+            clienteEmail: cliente.email,          // Email del cliente
+            comercianteId: comercianteId,         // UID del comerciante (tiene que venir del frontend)
+            items: items,                         // Lista de productos [{nombre, cantidad, precio}]
+            total: total,                         // Total de la compra
+            category: category,                   // Categoría del comercio (opcional)
+            status: "pending",                    // Estado inicial
+            createdAt: new Date().toISOString()   // Fecha
+        });
+
+        alert("Compra enviada correctamente");
+    } catch (error) {
+        console.error("Error al enviar compra:", error);
+        alert("Error al enviar compra");
+    }
+}
+async function loadPurchasesToApprove(comercianteId) {
+    try {
+        const purchasesRef = db.collection("purchases")
+            .where("comercianteId", "==", comercianteId)
+            .where("status", "==", "pending");
+
+        const snapshot = await purchasesRef.get();
+        const container = document.getElementById("purchasesToApprove");
+        container.innerHTML = "";
+
+        if (snapshot.empty) {
+            container.innerHTML = "<p>No hay compras pendientes.</p>";
+            return;
+        }
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const div = document.createElement("div");
+            div.className = "purchase-item";
+            div.innerHTML = `
+                <p><strong>Cliente:</strong> ${data.clienteEmail || "Desconocido"}</p>
+                <p><strong>Total:</strong> $${data.total.toFixed(2)}</p>
+                <p><strong>Productos:</strong><br>${data.items.map(item => `${item.nombre} x${item.cantidad}`).join("<br>")}</p>
+                <button onclick="approvePurchase('${doc.id}')">✅ Aprobar</button>
+                <button onclick="rejectPurchase('${doc.id}')">❌ Rechazar</button>
+            `;
+            container.appendChild(div);
+        });
+
+    } catch (error) {
+        console.error("Error al cargar compras por aprobar:", error);
+        document.getElementById("purchasesToApprove").innerHTML = "<p>Error al cargar compras.</p>";
+    }
+}
+
+    
+});
+// ... (el código anterior permanece igual hasta la función loadPurchasesToApprove)
+
+// Cargar compras pendientes de aprobación para el comerciante (versión mejorada)
+async function loadPurchasesToApprove(comercianteId) {
+    try {
+        const querySnapshot = await db.collection("purchases")
+            .where("comercianteId", "==", comercianteId)
+            .where("status", "==", "pending")
+            .orderBy("createdAt", "desc")
+            .get();
+        
+        const approveList = document.getElementById("purchasesToApprove");
+        approveList.innerHTML = "";
+        
+        if (querySnapshot.empty) {
+            approveList.innerHTML = "<p>No hay compras por aprobar</p>";
+            return;
+        }
+        
+        querySnapshot.forEach(doc => {
+            const purchase = doc.data();
+            const div = document.createElement("div");
+            div.className = "purchase-item";
+            div.innerHTML = `
+                <div class="purchase-details">
+                    <h4>Compra de ${purchase.clienteEmail}</h4>
+                    <p><strong>Categoría:</strong> ${purchase.category || 'Sin categoría'}</p>
+                    <p><strong>Fecha:</strong> ${new Date(purchase.createdAt).toLocaleString()}</p>
+                    <div class="items-list">
+                        <strong>Productos:</strong>
+                        ${purchase.items.map(item => `
+                            <div class="item">
+                                ${item.name} - ${item.quantity} x $${item.price.toFixed(2)} = $${item.total.toFixed(2)}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <p class="total"><strong>Total:</strong> $${purchase.total.toFixed(2)}</p>
+                </div>
+                <div class="purchase-actions">
+                    <button class="approve-btn" onclick="approvePurchase('${doc.id}', '${purchase.clienteId}', ${purchase.total})">
+                        Aprobar Compra
+                    </button>
+                    <button class="reject-btn" onclick="rejectPurchase('${doc.id}')">
+                        Rechazar Compra
+                    </button>
+                </div>
+            `;
+            approveList.appendChild(div);
+        });
+        
+    } catch (error) {
+        console.error("Error al cargar compras por aprobar:", error);
+        approveList.innerHTML = "<p>Error al cargar compras pendientes</p>";
+    }
+}
+////////aprovacion compras 
+async function approvePurchase(purchaseId, clienteId, total) {
+    const comerciante = auth.currentUser;
+    if (!comerciante) {
+        mostrarError("Debes iniciar sesión como comerciante");
+        return false;
+    }
+
+    try {
+        // 1. Verificación inicial
+        const purchaseRef = db.collection("purchases").doc(purchaseId);
+        const purchaseDoc = await purchaseRef.get();
+        
+        if (!purchaseDoc.exists) {
+            mostrarError("La compra no existe o fue eliminada");
+            return false;
+        }
+        
+        const purchaseData = purchaseDoc.data();
+        if (purchaseData.status !== "pending") {
+            mostrarError(`Esta compra ya fue ${purchaseData.status}`);
+            return false;
+        }
+
+        // 2. Manejo de fiado con transacción
+        let resultado = await manejarAprobacionConFiado(
+            comerciante.uid,
+            clienteId,
+            total,
+            purchaseRef,
+            purchaseData
+        );
+
+        if (!resultado) return false;
+
+        // 3. Notificaciones y actualización
+        await enviarNotificacion(clienteId, purchaseId, "approved");
+        await actualizarVistasCompletas(comerciante.uid, clienteId);
+        
+        mostrarExito(resultado.mensaje);
+        return true;
+
+    } catch (error) {
+        console.error("Error en approvePurchase:", error);
+        mostrarError(`Error al procesar: ${error.message}`);
+        return false;
+    }
+}
+
+// Función auxiliar para manejar la lógica de fiado
+async function manejarAprobacionConFiado(comercianteId, clienteId, total, purchaseRef, purchaseData) {
+    const fiadoRef = db.collection("users").doc(comercianteId)
+        .collection("fiados").doc(clienteId);
+    
+    const fiadoDoc = await fiadoRef.get();
+    let aprobarSinFiado = false;
+    
+    if (!fiadoDoc.exists) {
+        const respuesta = await mostrarConfirmacion(
+            "Cliente sin fiado",
+            "Este cliente no tiene crédito habilitado. ¿Desea aprobar igual?",
+            "Aprobar sin fiado",
+            "Cancelar"
+        );
+        if (!respuesta) return false;
+        aprobarSinFiado = true;
+    }
+
+    return await db.runTransaction(async (transaction) => {
+        // Verificación adicional de estado dentro de la transacción
+        const currentDoc = await transaction.get(purchaseRef);
+        if (currentDoc.data().status !== "pending") {
+            throw new Error("La compra ya fue procesada");
+        }
+
+        // Actualización principal
+        transaction.update(purchaseRef, {
+            status: "approved",
+            approvedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            approvedBy: comercianteId,
+            paid: !aprobarSinFiado
+        });
+
+        // Lógica de fiado
+        if (fiadoDoc.exists && !aprobarSinFiado) {
+            const fiadoData = fiadoDoc.data();
+            const nuevoMonto = fiadoData.monto_fiado - total;
+            
+            if (nuevoMonto < 0) {
+                throw new Error("Crédito insuficiente");
+            }
+            
+            transaction.update(fiadoRef, {
+                monto_fiado: nuevoMonto,
+                ultima_compra: new Date().toISOString()
+            });
+
+            // Registro de transacción
+            const transaccionRef = fiadoRef.collection("transacciones").doc();
+            transaction.set(transaccionRef, {
+                tipo: "compra",
+                monto: total,
+                fecha: new Date().toISOString(),
+                compraId: purchaseId,
+                saldo_anterior: fiadoData.monto_fiado,
+                saldo_posterior: nuevoMonto,
+                descripcion: `Compra en ${purchaseData.category || 'varios'}`,
+                comercianteId: comercianteId
+            });
+        }
+
+        return {
+            exito: true,
+            mensaje: aprobarSinFiado 
+                ? "Compra aprobada (sin descuento de crédito)" 
+                : "Compra aprobada y descontada del crédito"
+        };
+    });
+}
+
+// Función mejorada para actualizar vistas
+async function actualizarVistasCompletas(comercianteId, clienteId) {
+    try {
+        const esClienteVisible = document.getElementById('clienteDetails').style.display === 'block';
+        
+        await Promise.all([
+            loadMerchantPurchases(comercianteId),
+            loadClientesFiado(comercianteId),
+            esClienteVisible ? loadClientPurchases(clienteId) : Promise.resolve(),
+            esClienteVisible ? loadMyFiados(clienteId) : Promise.resolve()
+        ]);
+        
+        // Forzar actualización de la UI
+        if (esClienteVisible) {
+            mostrarDetallesCliente(clienteId);
+        }
+    } catch (error) {
+        console.error("Error actualizando vistas:", error);
+    }
+}
+
+// Función para enviar notificaciones
+async function enviarNotificacion(clienteId, purchaseId, accion) {
+    try {
+        await db.collection("notifications").add({
+            userId: clienteId,
+            type: `purchase_${accion}`,
+            purchaseId: purchaseId,
+            fecha: new Date().toISOString(),
+            leida: false,
+            mensaje: accion === "approved" 
+                ? "Tu compra fue aprobada" 
+                : "Tu compra fue rechazada"
+        });
+    } catch (error) {
+        console.error("Error enviando notificación:", error);
+    }
+}
+
+
+
+// Función mejorada para cargar compras del cliente
+async function loadClientPurchases(clienteId) {
+    try {
+        mostrarCargando(true, 'clientPurchases');
+        
+        const [pending, approved] = await Promise.all([
+            db.collection("purchases")
+                .where("clienteId", "==", clienteId)
+                .where("status", "==", "pending")
+                .orderBy("createdAt", "desc")
+                .get(),
+            db.collection("purchases")
+                .where("clienteId", "==", clienteId)
+                .where("status", "==", "approved")
+                .orderBy("approvedAt", "desc")
+                .limit(10)
+                .get()
+        ]);
+
+        mostrarComprasEnUI('pendingPurchasesList', pending);
+        mostrarComprasEnUI('approvedPurchasesList', approved);
+
+    } catch (error) {
+        console.error("Error cargando compras del cliente:", error);
+        mostrarError("Error al cargar tu historial de compras");
+    } finally {
+        mostrarCargando(false, 'clientPurchases');
+    }
+}
+
+// Función para mostrar compras en la UI
+function mostrarComprasEnUI(elementId, snapshot) {
+    const container = document.getElementById(elementId);
+    if (!container) return;
+
+    container.innerHTML = snapshot.empty 
+        ? `<div class="no-items">No hay compras</div>`
+        : Array.from(snapshot.docs).map(doc => crearCardCompra(doc)).join('');
+}
+
+// Crear tarjeta de compra
+function crearCardCompra(doc) {
+    const data = doc.data();
+    const isApproved = data.status === "approved";
+    
+    return `
+        <div class="compra-card ${data.status}">
+            <div class="compra-header">
+                <span class="compra-status">${isApproved ? '✅ Aprobada' : '🕒 Pendiente'}</span>
+                <span class="compra-fecha">${formatearFecha(isApproved ? data.approvedAt : data.createdAt)}</span>
+            </div>
+            <div class="compra-body">
+                <div class="compra-total">$${data.total.toFixed(2)}</div>
+                <div class="compra-productos">
+                    ${data.items.slice(0, 3).map(item => `
+                        <div class="producto">${item.nombre} x${item.cantidad}</div>
+                    `).join('')}
+                    ${data.items.length > 3 ? `<div class="more-items">+${data.items.length - 3} más</div>` : ''}
+                </div>
+            </div>
+            ${isApproved ? `
+                <div class="compra-footer">
+                    Aprobada por: ${data.approvedBy || 'sistema'}
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+    </script>
+</body>
+</html>
